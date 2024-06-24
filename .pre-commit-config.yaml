@@ -1,0 +1,38 @@
+repos:
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.3.1
+    hooks:
+      - id: pyupgrade
+        args: ["--keep-runtime-typing", "--py310-plus"]
+  - repo: git@github.com:myint/autoflake.git
+    rev: v2.0.1
+    hooks:
+      - id: autoflake
+        args:
+          [
+            "--in-place",
+            "--remove-all-unused-imports",
+            "--remove-unused-variable",
+            "--ignore-init-module-imports"
+          ]
+  - repo: local
+    hooks:
+      - id: flake
+        name: flake
+        entry: flake8 --count
+        language: system
+        types: [python]
+        stages: [commit]
+        pass_filenames: false
+      - id: mypy
+        name: mypy
+        language: system
+        entry: mypy .
+        stages: [commit]
+        pass_filenames: false
+      - id: black
+        name: black
+        language: system
+        entry: black .
+        stages: [commit]
+        pass_filenames: false
