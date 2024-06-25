@@ -1,36 +1,46 @@
 # Envrac
 
-*Makes using environment variables nicer and safer.*
+*Brings consistency to environment variables.*
 
 ## Overview
 
-Envrac is a library which solves some of the pain points of working with environment variables in Python:
+Envrac (**en**vironment **v**ariable **r**eading **a**nd **c**hecking) helps you:
 
-* Unset variables can cause unpredictable results.
-* You may need to parse values to different types.
-* You can't readily discover which variables your code wants to read.
-* You don't want to leak the values to logs etc.
+* Read, convert and constrain environment variables.
+* Discover which variables your project uses.
+* Ensure each variable is treated consistently throughout your project.
 
-The word "envrac" is:
+##### Taster code
 
-  * An abbreviation of **en**vironment **v**ariable **r**eading **a**nd **c**hecking.
-  * A play on the French term *"en vrac"*.
+```python
+>>> from envrac import env
+>>> env.dict('DB_NAME', 'DB_PORT:int=5432')
+{'DB_NAME': 'test_db', 'DB_PORT': 5432}
+>>> env.print()
+NAME                  TYPE DEFAULT     NULLABLE CHOICES MIN  MAX  RAW
+------------------------------------------------------------------------------
+DB_NAME               str  <undefined> False    None    None None ***HIDDEN***
+DB_PORT               int  5432        False    None    None None ***HIDDEN***
+ENVRAC_DISCOVERY_MODE bool False       False    None    None None ***HIDDEN***
+ENVRAC_PRINT_VALUES   bool False       False    None    None None ***HIDDEN***
+```
 
-## Tutorial
+> Note how **envrac**:
+> * Hides values by default for security (also in error messages).
+> * Differentiates between None and undefined.
+> * Detects variables requested in imported libraries (including envrac itself) so long as they use envrac (raise them PRs)
 
-The tutorial takes about 3 minutes and covers all you need to know.
+## Usage
 
-### Installation
+### Experimenting
 
-You can safely install and uninstall envrac - there are no third party dependencies:
+The easiest way to experiment is to install envrac:
 
 ```
 pip install envrac
 ```
 
-### Experimenting
-
-The easiest way to experiment is to open a Python shell and set environment variables using `os.environ`:
+And open a Python shell and set environment variables using `os.environ`:
 
 ```python
 >>> import os
@@ -41,7 +51,7 @@ The easiest way to experiment is to open a Python shell and set environment vari
 Note that environment variables are:
 
 - Always stored as strings.
-- Loaded into `os.environ` when the Python process starts.
+
 - Only set in the current process and child processes.
 
 So variables you set this way will not affect your shell session or system.
@@ -57,7 +67,7 @@ Import `env` exactly like this:
 Note that `env` is an object, not a module, so **this won't work**:
 
 ```python
-# DON'T DO THIS
+# THIS WON'T WORK
 >>> from envrac.env import *
 ```
 
@@ -72,7 +82,7 @@ Read environment variables using the method corresponding the type you want:
 42
 ```
 
-The simple read methods available are  `str`, `bool`, `int`, `float` `date`, `datetime` and `time`.
+The basic read methods available are  `str`, `bool`, `int`, `float`, `date`, `datetime` and `time`. There are fancier methods for `dict`, `list` and `json`.
 
 If a variable is not set and no default was provided, you get an error:
 
@@ -96,7 +106,7 @@ envrac.exceptions.EnvracSpecificationError:
   See envrac documentation for help.
 ````
 
-Environment variables are inputs to your program, and should be validated/converted the same way throughout. Envrac helps ensure this.
+An environment variable should be treated consistently throughout your code. You can guarantee this by reading *all* environment variables through envrac (plus you get [discovery](#Discovery)). Note that this only applies to your code, and third party libraries which use envrac.
 
 While experimenting you can simply `clear` envrac's register:
 
@@ -185,9 +195,9 @@ True
 This restriction prevents arbitrary values from being interpreted as `True` as would happen if you simply used `bool()` :
 
 ```python
->>> os.environ['AGE'] = '42'
 >>> bool(42)
 True
+>>> os.environ['AGE'] = '42'
 >>> env.bool('AGE')
   Value for environment variable "AGE" could not be parsed to type `bool`.
   Value: ***HIDDEN***
@@ -243,7 +253,7 @@ Another option is to interpret the text `NULL` or `NONE` as `None` which you can
 
 ```python
 >>> os.environ['F0NT_STYLE'] = 'NONE'
->>> env.str('FONT_STYLE', choices=['BOLD', 'ITALIC', None])
+>>> env.str_('FONT_STYLE', choices=['BOLD', 'ITALIC', None])
 None
 ```
 
@@ -251,7 +261,7 @@ This protects you against unset variables:
 
 ```python
 >>> del os.environ['F0NT_STYLE']
->>> env.str('FONT_STYLE', choices=['BOLD', 'ITALIC', None])
+>>> env.str_('FONT_STYLE', choices=['BOLD', 'ITALIC', None])
 envrac.exceptions.EnvracUnsetVariableError: 
   Environment variable "FONT_STYLE" must be set.
   See envrac documentation for help.
@@ -268,9 +278,9 @@ This also allows you to set a default other than `None`:
 
 Of course, setting a default puts you back to being vulnerable to unset variables and typos. 
 
-### Read many values at once
+### Read values as dict
 
-You can read many environment variables at once like so:
+You can read multiple environment variables to a dict like so:
 
 ```python
 >>> os.environ['DB_NAME'] = 'users_db'
@@ -283,8 +293,8 @@ The syntax is as follows:
 
 ```python
 'FOO'          # read FOO as a string
-'FOO=bar      # read FOO as a string, default to 'bar'
-'FOO:int'     # read FOO as an int
+'FOO=bar'      # read FOO as a string, default to 'bar'
+'FOO:int'      # read FOO as an int
 'FOO:int=0'    # read FOO as an int, default to 0
 '?FOO:int'     # read FOO as an int, but allow 'NULL'
 '?FOO:int=0'   # read FOO as an int, default to 0, but allow 'NULL'
@@ -302,14 +312,7 @@ envrac.exceptions.EnvracSpecificationError:
   See envrac documentation for help.
 ```
 
-The `dict` method doesn't support choices, min or max values. If you need to do that:
-
-```python
-{
-    **env.dict('WIDTH:int', 'HEIGHT:int'),
-    'COLOR' = env.str('COLOR', choices=colors)
-}
-```
+The `dict` method doesn't support choices, min or max values. 
 
 ### Prefixes
 
@@ -333,7 +336,7 @@ You typically use this with the `dict` method:
 >>> os.environ['USER_DB_NAME'] = 'users_db'
 >>> os.environ['USER_DB_PORT'] = '5432'
 >>> with env.prefix('USER_DB_'):
-...   conn_args = env.dict('NAME', 'PORT:int')
+...   env.dict('NAME', 'PORT:int')
 ...
 {'USER_DB_NAME': 'users_db', 'USER_DB_PORT': 5432}
 ```
@@ -345,7 +348,7 @@ You can also remove the prefix from the dictionary keys:
 >>> os.environ['USER_DB_NAME'] = 'users_db'
 >>> os.environ['USER_DB_PORT'] = '5432'
 >>> with env.prefix('USER_DB_'):
-...   conn_args = env.dict('NAME', 'PORT:int', drop_prefix=False)
+...   env.dict('NAME', 'PORT:int', drop_prefix=False)
 ...
 {'NAME': 'users_db', 'PORT': 5432}
 ```
@@ -374,12 +377,10 @@ env.config.discovery_mode = True
 
 #### Available options
 
-| Name           | Type | Default | Effect                                                   |
-| -------------- | ---- | ------- | -------------------------------------------------------- |
-| discovery_mode | bool | False   | Suppresses Unset errors so you can discover (see below). |
-| print_values   | bool | False   | Causes values to be printed in errors and discovery.     |
-
-Note that more advanced logging which records variables may still leak the values.
+| Name           | Type | Default | Effect                                               |
+| -------------- | ---- | ------- | ---------------------------------------------------- |
+| discovery_mode | bool | False   | Suppresses errors so you can discover (see below).   |
+| print_values   | bool | False   | Causes values to be printed in errors and discovery. |
 
 ### Discovery
 
@@ -395,14 +396,17 @@ ENVRAC_DISCOVERY_MODE bool False   False    None    None None
 ENVRAC_PRINT_VALUES   bool False   False    None    None None
 ```
 
-If your throws `UnsetVariableErrors` before you reach this, set `discovery_mode = True` which suppresses those errors:
+The idea is to be able to see at a glance all the configuration options that are required or available in your project.
+
+Of course, your code may throw errors for unset/badly set variables. To get around this, set `discovery_mode = True` which suppresses those errors, allowing you to print:
 
 ```python
->>> from envrac import env
->>> env.config.discovery_mode = True
->>> import your_code # won't throw UnsetVariableErrors
->>> env.print()
+from envrac import env
+env.config.discovery_mode = True
+import your_code
+env.print()
 ```
+
 
 Additionally you can set `print_values = True` which will show you the current raw (uncoverted) value of the environment variable:
 
@@ -417,6 +421,27 @@ ENVRAC_DISCOVERY_MODE bool False   False    None    None None None
 ENVRAC_PRINT_VALUES   bool False   False    None    None None None 
 ```
 
+If any third party library use envrac too, you will see the environment variables they request. If they don't, why not send them a PR?
+
+### Security considerations
+
+Environment variables often contain sensitive information like passwords, and a simple mistake could easily leak this information:
+
+```python
+>>> os.environ['DB_PORT'] = 'MY_BIG_FAT_DB_PASSWORD'
+>>> os.environ['DB_PASS'] = '5432'
+>>> float(os.environ['DB_PORT'])
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+ValueError: could not convert string to float: 'MY_BIG_FAT_DB_PASSWORD'
+```
+
+If errors are captured in log files, sent to some third party service or (worst of all) displayed in a web page, this could be a serious problem.
+
+Envrac helps prevent this to a small degree (just make sure `print_values = False` in prod) but can't fully protect you. 
+
+Bear in mind that some logging services will capture local variables. Most services (such as Sentry) have options to scrub sensitive data, however these are only as good as you configure them to be.
+
 ## Issues
 
 Please [raise an issue on github](https://github.com/andyhasit/envrac/issues) or submit a PR.
@@ -424,5 +449,4 @@ Please [raise an issue on github](https://github.com/andyhasit/envrac/issues) or
 ## Licence
 
 MIT
-
 
