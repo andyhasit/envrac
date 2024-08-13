@@ -28,7 +28,7 @@ ENVRAC_PRINT_VALUES   bool False       False    None    None None ***HIDDEN***
 > Note how **envrac**:
 > * Hides values by default for security (also in error messages).
 > * Differentiates between None and undefined.
-> * Detects variables requested in imported libraries (including envrac itself) so long as they use envrac (raise them PRs)
+> * Detects variables requested in imported libraries which use envrac (including envrac itself).
 
 ## Usage
 
@@ -40,12 +40,12 @@ The easiest way to experiment is to install envrac:
 pip install envrac
 ```
 
-And open a Python shell and set environment variables using `os.environ`:
+Then open a Python shell and use `os.environ` to set and unset variables:
 
 ```python
 >>> import os
->>> os.environ['NAME'] = 'Andy'
->>> os.environ['AGE'] = '42'
+>>> os.environ['FOO'] = 'bar'
+>>> del os.environ['FOO']
 ```
 
 Note that environment variables are:
@@ -73,11 +73,13 @@ Note that `env` is an object, not a module, so **this won't work**:
 
 ### Reading variables
 
-Read environment variables using the method corresponding the type you want:
+Read environment variables using the method corresponding to the type you want the variable to be converted to:
 
 ```python
+>>> os.environ['NAME'] = 'Bob'
+>>> os.environ['AGE'] = '42'
 >>> env.str('NAME')
-'Andy'
+'Bob'
 >>> env.int('AGE')
 42
 ```
@@ -89,11 +91,26 @@ If a variable is not set and no default was provided, you get an error:
 ```python
 >>> env.str('CITY')
 envrac.exceptions.EnvracUnsetVariableError:
-  Environment variable CITY must be set.
+  Environment variable "CITY" must be set.
   See envrac documentation for help.
 ```
 
+If the value can't be parsed to the requested type, you get an error:
+
+```python
+>>> os.environ['AGE'] = 'fourty two'
+>>> env.int('AGE')
+envrac.exceptions.EnvracParsingError: 
+  Value for environment variable "AGE" could not be parsed to type `int`.
+  Value: ***HIDDEN***
+  See envrac documentation for help.
+```
+
+Notice how envrac hides the value form the print out. This is to reduce the chance of accidentally leaking environment variables, which is a major security risk. You can override this behaviour in configuration.
+
 ### Consistency checks
+
+An environment variable should be treated consistently throughout your code. 
 
 If you try to read `AGE` as `str` having previously read it as `int` you get an error:
 
@@ -106,7 +123,7 @@ envrac.exceptions.EnvracSpecificationError:
   See envrac documentation for help.
 ````
 
-An environment variable should be treated consistently throughout your code. You can guarantee this by reading *all* environment variables through envrac (plus you get [discovery](#Discovery)). Note that this only applies to your code, and third party libraries which use envrac.
+You can guarantee this by reading *all* environment variables through envrac (plus you get [discovery](#Discovery)). Note that this only applies to your code, and third party libraries which use envrac.
 
 While experimenting you can simply `clear` envrac's register:
 
@@ -154,21 +171,6 @@ datetime.date(2024, 6, 24)
 >>> env.date('DOB', '2000-01-01')
 datetime.date(2000, 1, 1)
 ```
-
-### Parsing errors
-
-If the value can't be parsed to that type you get an error:
-
-```python
->>> os.environ['AGE'] = 'fourty two'
->>> env.int('AGE')
-envrac.exceptions.EnvracParsingError: 
-  Value for environment variable "AGE" could not be parsed to type `int`.
-  Value: ***HIDDEN***
-  See envrac documentation for help.
-```
-
-Notice how envrac hides the value form the print out. This is to reduce the chance of accidentally leaking environment variables, which is a major security risk. You can override this behaviour in configuration.
 
 ### Read different types
 
