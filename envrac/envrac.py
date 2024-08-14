@@ -94,8 +94,14 @@ class _Env:
         finally:
             self._prefix = None
 
-    def clear(self) -> None:
-        self._register.clear()
+    def reset(self) -> None:
+        self._register.reset()
+
+    def put(self, name: str, value: Any = None) -> None:
+        if value is None:
+            del os.environ[name]
+        else:
+            os.environ[name] = str(value)
 
     def print(self, *order_by: str) -> None:
         self._register.print(*order_by)

@@ -30,22 +30,6 @@ Envrac has no dependencies so can be installed easily:
 pip install envrac
 ```
 
-## Experimenting
-
-The easiest way to experiment is to open a Python shell and use `os.environ` to set and unset variables:
-
-```python
->>> import os
->>> os.environ['foo'] = 'bar'
->>> del os.environ['foo']
-```
-
-Note that environment variables are:
-
-- Always stored as strings.
-
-- Only set in the current process and any child processes.
-
 ## Usage
 
 ### Importing
@@ -63,6 +47,33 @@ Note that `env` is **an object, not a module**, so this won't work:
 from envrac.env import *
 from envrac.env import str
 ```
+
+### Setting variables
+
+Note that environment variables:
+
+- Are always stored as strings.
+- Are only set in the current process and any child processes.
+
+The `put` method is a quick way to set and delete environment variables while testing: 
+
+```python
+>>> env.put('AGE', 42)
+>>> os.environ['AGE']
+'42'
+>>> env.put('AGE')
+>>> os.environ['AGE']
+KeyError: 'AGE'
+```
+
+This is the equivalent of doing:
+
+```python
+>>> os.environ['AGE'] = '42'
+>>> del os.environ['AGE']
+```
+
+The examples that follow will mostly use the latter to show the type conversion more clearly.
 
 ### Reading variables
 
@@ -170,12 +181,12 @@ Ensuring consistency avoids many problems with environment variables, which are 
 
 Envrac does this by storing the specification from the first attempt to read a variable, including the default values (it doesn't store the read values) in a register. 
 
-While experimenting you can simply `clear` envrac's register:
+While experimenting you can simply `reset` envrac's register:
 
 ```python
 >>> env.int('AGE')
 42
->>> env.clear()
+>>> env.reset()
 >>> env.str('AGE')
 '42'
 ```
@@ -264,7 +275,7 @@ envrac.exceptions.EnvracUnsetVariableError:
 The way around this is to pass `read_none=True` which interprets `NULL` or `NONE` (case insensitive) as `None`:
 
 ```python
->>> env.clear()
+>>> env.reset()
 >>> os.environ['FONT_STYLE'] = 'none'
 >>> env.str('FONT_STYLE', choices=[None, 'BOLD', 'ITALIC'], read_none=True)
 None
@@ -275,7 +286,7 @@ The above forces the environment to set a value as there is no default.
 You can still provide a default, which may be something other than `None`:
 
 ```python
->>> env.clear()
+>>> env.reset()
 >>> del os.environ['FONT_STYLE']
 >>> env.str('FONT_STYLE', 'BOLD', choices=['BOLD', 'ITALIC', None], read_none=True)
 'BOLD'

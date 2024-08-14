@@ -6,10 +6,10 @@ from envrac import env as _env
 @pytest.fixture
 def env():
     """
-    Use this fixture to clear `env` after the test has run.
+    Use this fixture to reset `env` after the test has run.
     """
     yield _env
-    _env.clear()
+    _env.reset()
 
 
 @pytest.fixture
