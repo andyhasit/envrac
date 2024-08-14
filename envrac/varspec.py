@@ -14,7 +14,7 @@ class VarSpec:
     type: ValueType
     default: Any
     choices: list[Any] | None = None
-    nullable: bool = False
+    read_none: bool = False
     min_val: Any = None
     max_val: Any = None
 

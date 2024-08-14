@@ -4,98 +4,83 @@
 
 ## Overview
 
-Envrac (**en**vironment **v**ariable **r**eading **a**nd **c**hecking) helps you:
-
-* Read, convert and constrain environment variables.
-* Discover which variables your project uses.
-* Ensure each variable is treated consistently throughout your project.
-
-##### Taster code
+Envrac (**en**vironment **v**ariable **r**eading **a**nd **c**hecking) is a tiny library for reading environment variables in Python:
 
 ```python
 >>> from envrac import env
->>> env.dict('DB_NAME', 'DB_PORT:int=5432')
-{'DB_NAME': 'test_db', 'DB_PORT': 5432}
->>> env.print()
-NAME                  TYPE DEFAULT     NULLABLE CHOICES MIN  MAX  RAW
-------------------------------------------------------------------------------
-DB_NAME               str  <undefined> False    None    None None ***HIDDEN***
-DB_PORT               int  5432        False    None    None None ***HIDDEN***
-ENVRAC_DISCOVERY_MODE bool False       False    None    None None ***HIDDEN***
-ENVRAC_PRINT_VALUES   bool False       False    None    None None ***HIDDEN***
+>>> env.int('AGE')
+42
 ```
 
-> Note how **envrac**:
-> * Hides values by default for security (also in error messages).
-> * Differentiates between None and undefined.
-> * Detects variables requested in imported libraries which use envrac (including envrac itself).
+You should definitely use envrac instead or `os.environ`/`os.getenv` as it:
 
-## Usage
+1. Ensures variables are read consistently (type and default) throughout your project*.
+2. Lets you discover all the variables that your project* reads.
+3. Removes code bloat for casting types and catching errors etc.
+4. Improves safety by not printing the actual values to STDOUT in errors.
+5. Handles prefixing, grouping to dictionary, explicit null and other useful bits.
 
-### Experimenting
+*\* Not just your project, but any imported package which uses envrac too, so spread the word!*
 
-The easiest way to experiment is to install envrac:
+## Installation
+
+Envrac has no dependencies so can be installed easily:
 
 ```
 pip install envrac
 ```
 
-Then open a Python shell and use `os.environ` to set and unset variables:
+## Experimenting
+
+The easiest way to experiment is to open a Python shell and use `os.environ` to set and unset variables:
 
 ```python
 >>> import os
->>> os.environ['FOO'] = 'bar'
->>> del os.environ['FOO']
+>>> os.environ['foo'] = 'bar'
+>>> del os.environ['foo']
 ```
 
 Note that environment variables are:
 
 - Always stored as strings.
 
-- Only set in the current process and child processes.
+- Only set in the current process and any child processes.
 
-So variables you set this way will not affect your shell session or system.
+## Usage
 
 ### Importing
 
 Import `env` exactly like this:
 
 ```python
->>> from envrac import env
+from envrac import env
 ```
 
-Note that `env` is an object, not a module, so **this won't work**:
+Note that `env` is **an object, not a module**, so this won't work:
 
 ```python
-# THIS WON'T WORK
->>> from envrac.env import *
+# DON'T DO THIS!
+from envrac.env import *
+from envrac.env import str
 ```
 
 ### Reading variables
 
-Read environment variables using the method corresponding to the type you want the variable to be converted to:
+Read environment variables using methods `str`, `bool`, `int`, `float`, `date`, `datetime` or `time` which work as you'd expect:
 
 ```python
 >>> os.environ['NAME'] = 'Bob'
 >>> os.environ['AGE'] = '42'
+>>> os.environ['DOB'] = '2000-01-01'
 >>> env.str('NAME')
 'Bob'
 >>> env.int('AGE')
 42
+>>> env.date('DOB')
+datetime.date(2000, 1, 1)
 ```
 
-The basic read methods available are  `str`, `bool`, `int`, `float`, `date`, `datetime` and `time`. There are fancier methods for `dict`, `list` and `json`.
-
-If a variable is not set and no default was provided, you get an error:
-
-```python
->>> env.str('CITY')
-envrac.exceptions.EnvracUnsetVariableError:
-  Environment variable "CITY" must be set.
-  See envrac documentation for help.
-```
-
-If the value can't be parsed to the requested type, you get an error:
+If envrac can't parse the value, you get an error:
 
 ```python
 >>> os.environ['AGE'] = 'fourty two'
@@ -106,75 +91,98 @@ envrac.exceptions.EnvracParsingError:
   See envrac documentation for help.
 ```
 
-Notice how envrac hides the value form the print out. This is to reduce the chance of accidentally leaking environment variables, which is a major security risk. You can override this behaviour in configuration.
+> Notice how envrac masks the actual value to minimises the risk of leaking secrets to logs etc. You can override this behaviour in configuration.
+
+### Default values
+
+You can provide default values raw, or as a string:
+
+```python
+>>> env.int('SIZE', 10)
+10
+>>> env.int('SIZE', '10')
+10
+```
+
+If you don't specify a default, you get an error if the environment variable is not set:
+
+```python
+>>> env.str('CITY')
+envrac.exceptions.EnvracUnsetVariableError:
+  Environment variable "CITY" must be set.
+  See envrac documentation for help.
+```
 
 ### Consistency checks
 
-An environment variable should be treated consistently throughout your code. 
+If you attempt to read a variable using a different default to previously, you get an error:
 
-If you try to read `AGE` as `str` having previously read it as `int` you get an error:
-
-````python
->>> env.str('AGE')
+```python
+>>> env.int('SIZE', 10)
+10
+>>> env.int('SIZE', 11)
 envrac.exceptions.EnvracSpecificationError: 
-  Environment variable "AGE" requested differently in multiple places.
+  Environment variable "SIZE" requested differently in multiple places.
   Diff: 
-    type: str != int
+    default: 10 != 11
   See envrac documentation for help.
-````
+```
 
-You can guarantee this by reading *all* environment variables through envrac (plus you get [discovery](#Discovery)). Note that this only applies to your code, and third party libraries which use envrac.
+The same applies for going from default to no default or vice versa:
+
+```python
+>>> env.int('SIZE')
+envrac.exceptions.EnvracSpecificationError: 
+  Environment variable "SIZE" requested differently in multiple places.
+  Diff: 
+    default: 10 != <undefined>
+  See envrac documentation for help
+```
+
+Note that `<undefined>` (borrowed from JavaScript) is not the same as `None` which is a valid default:
+
+```python
+>>> env.int('WEIGHT', None)
+None
+>>> env.int('WEIGHT')
+envrac.exceptions.EnvracSpecificationError: 
+ Environment variable "WEIGHT" requested differently in multiple places.
+  Diff: 
+    default: None != <undefined>
+  See envrac documentation for help.
+```
+
+You also get an error if you attempt to read a variable using a different type to previously:
+
+```python
+>>> os.environ['HEIGHT'] = '175'
+>>> env.int('HEIGHT')
+175
+>>> env.float('HEIGHT')
+envrac.exceptions.EnvracSpecificationError: 
+  Environment variable "HEIGHT" requested differently in multiple places.
+  Diff: 
+    type: int != float
+  See envrac documentation for help.
+```
+
+Ensuring consistency avoids many problems with environment variables, which are already quite accident prone due to typos and such.
+
+Envrac does this by storing the specification from the first attempt to read a variable, including the default values (it doesn't store the read values) in a register. 
 
 While experimenting you can simply `clear` envrac's register:
 
 ```python
+>>> env.int('AGE')
+42
 >>> env.clear()
 >>> env.str('AGE')
 '42'
 ```
 
-### Default values
+### Dates and booleans
 
-You can provide default values raw:
-
-```python
->>> from datetime import date
->>> env.date('DOB', date(2000, 1, 1))
-datetime.date(2000, 1, 1)
-```
-
-Or as strings:
-
-```python
->>> env.date('DOB', '2000-01-01')
-datetime.date(2000, 1, 1)
-```
-
-The above didn't raise an error as both dates are the same, but a different default will result in an error: 
-
-```python
->>> env.date('DOB', '1999-09-09')
-envrac.exceptions.EnvracSpecificationError: 
-  Environment variable "AGE" requested differently in multiple places.
-  Diff: 
-    default: date(2000, 1, 1) != date(1999, 9, 9)
-  See envrac documentation for help.
-```
-
-Envrac stores variable specifications but not the values:
-
-```python
->>> os.environ['DOB'] = '2024-06-24'
->>> env.date('DOB', '2000-01-01')
-datetime.date(2024, 6, 24)
->>> del os.environ['DOB']
->>> env.date('DOB', '2000-01-01')
-datetime.date(2000, 1, 1)
-```
-
-### Read different types
-
-##### date, datetime and time
+##### Date, datetime and time
 
 These use the type's `fromisoformat` internally so you must use ISO format:
 
@@ -184,7 +192,7 @@ These use the type's `fromisoformat` internally so you must use ISO format:
 >>> env.date('TIME', '16:20')
 ```
 
-##### bool
+##### Boolean
 
 Boolean variables must be `1`, `0` `true` or `false` case insensitive:
 
@@ -233,60 +241,53 @@ envrac.exceptions.EnvracRangeError:
 
 These options are only applicable to types for which it makes sense.
 
-### Allow None
+### Nullable variables
 
-In some cases `None` is a valid value:
+Sometimes `None` is a valid value, in choices or otherwise:
 
 ```python
->>> env.str('FONT_STYLE', choices=['BOLD', 'ITALIC', None])
+>>> env.str('FONT_STYLE', choices=[None, 'BOLD', 'ITALIC'])
 ```
 
-However there is no way to set the value to `None` via the environment.
+But you cannot set an environment variable to `None`. All you can do is leave it unset, which in the above example will throw an `EnvracUnsetVariableError` as there is no default.
 
-If you set `None` as the default value, you will not detect unset variables, which can easily happen with a typo:
-
-```python
->>> os.environ['F0NT_STYLE'] = 'BOLD'
->>> env.str('FONT_STYLE', None, choices=['BOLD', 'ITALIC', None])
-None
-```
-
-Another option is to interpret the text `NULL` or `NONE` as `None` which you can do by adding `_` to the method name:
+You could set `None` as default, but then you would not detect if a variable is unset or typed wrong:
 
 ```python
->>> os.environ['F0NT_STYLE'] = 'NONE'
->>> env.str_('FONT_STYLE', choices=['BOLD', 'ITALIC', None])
-None
-```
-
-This protects you against unset variables:
-
-```python
->>> del os.environ['F0NT_STYLE']
->>> env.str_('FONT_STYLE', choices=['BOLD', 'ITALIC', None])
+>>> os.environ['FONT'] = 'BOLD'
+>>> env.str('FONT_STYLE', choices=[None, 'BOLD', 'ITALIC'])
 envrac.exceptions.EnvracUnsetVariableError: 
   Environment variable "FONT_STYLE" must be set.
   See envrac documentation for help.
 ```
 
-All the read methods we have seen so far have a counterpart with `_` suffix which will interpret `NULL` or `NONE` (case insensitive) as `None`.
-
-This also allows you to set a default other than `None`:
+The way around this is to pass `read_none=True` which interprets `NULL` or `NONE` (case insensitive) as `None`:
 
 ```python
->>> env.str_('FONT_STYLE', 'BOLD', choices=['BOLD', 'ITALIC', None])
-'BOLD'
+>>> env.clear()
+>>> os.environ['FONT_STYLE'] = 'none'
+>>> env.str('FONT_STYLE', choices=[None, 'BOLD', 'ITALIC'], read_none=True)
+None
 ```
 
-Of course, setting a default puts you back to being vulnerable to unset variables and typos. 
+The above forces the environment to set a value as there is no default.
+
+You can still provide a default, which may be something other than `None`:
+
+```python
+>>> env.clear()
+>>> del os.environ['FONT_STYLE']
+>>> env.str('FONT_STYLE', 'BOLD', choices=['BOLD', 'ITALIC', None], read_none=True)
+'BOLD'
+```
 
 ### Read values as dict
 
 You can read multiple environment variables to a dict like so:
 
 ```python
->>> os.environ['DB_NAME'] = 'users_db'
->>> os.environ['DB_PORT'] = '5432'
+>>> os.environ['NAME'] = 'users_db'
+>>> os.environ['PORT'] = '5432'
 >>> env.dict('NAME', 'PORT:int')
 {'DB_NAME': 'users_db', 'DB_PORT': 5432}
 ```
