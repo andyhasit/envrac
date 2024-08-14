@@ -21,7 +21,7 @@ class Register:
             self.vars[spec.name] = spec
 
     def reset(self) -> None:
-        self.vars.reset()
+        self.vars.clear()
 
     def list(self, *order_by: str) -> list[VarSpec]:
         if not order_by:
