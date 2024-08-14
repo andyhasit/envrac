@@ -14,19 +14,19 @@ class TestDictFieldParsing:
     def test_with_type_and_default(self, env, setvars):
         assert env.dict("foo:int=45") == {"foo": 45}
 
-    def test_nullablee(self, env, setvars):
+    def test_read_nonee(self, env, setvars):
         setvars(foo="NULL")
         assert env.dict("?foo") == {"foo": None}
 
-    def test_nullable_with_type(self, env, setvars):
+    def test_read_none_with_type(self, env, setvars):
         setvars(foo="NULL")
         assert env.dict("?foo:int") == {"foo": None}
 
-    def test_nullable_with_default(self, env, setvars):
+    def test_read_none_with_default(self, env, setvars):
         setvars(foo="NULL")
         assert env.dict("?foo=xyz") == {"foo": None}
 
-    def test_nullable_with_type_and_default(self, env, setvars):
+    def test_read_none_with_type_and_default(self, env, setvars):
         setvars(foo="NULL")
         assert env.dict("?foo:int=45") == {"foo": None}
 

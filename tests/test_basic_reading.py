@@ -37,9 +37,6 @@ class BasicReadingTest:
     def call(self, env, *args, **kwargs):
         return getattr(env, self.method)(*args, **kwargs)
 
-    def call_(self, env, *args, **kwargs):
-        return getattr(env, self.method + "_")(*args, **kwargs)
-
     def test_reading_set_variable_with_default_returns_set_value(self, env, setvars):
         setvars(foo=self.expected_value)
         assert self.call(env, "foo", self.default_value) == self.expected_value
@@ -53,52 +50,65 @@ class BasicReadingTest:
     ):
         assert self.call(env, "foo", self.default_value) == self.default_value
 
+    def test_setting_default_as_string_returns_converted_value(self, env, setvars):
+        assert self.call(env, "foo", str(self.default_value)) == self.default_value
+
+    def test_setting_default_as_string_and_raw_is_ok(self, env, setvars):
+        self.call(env, "foo", self.default_value)
+        self.call(env, "foo", str(self.default_value))
+
     def test_reading_unset_variable_without_default_raises_error(self, env, setvars):
         with pytest.raises(EnvracUnsetVariableError):
             self.call(env, "foo")
 
-    def test_reading_set_nullable_variable_with_default_returns_set_value(
+    def test_reading_set_read_none_variable_with_default_returns_set_value(
         self, env, setvars
     ):
         setvars(foo=str(self.expected_value))
-        assert self.call_(env, "foo", self.default_value) == self.expected_value
+        assert (
+            self.call(env, "foo", self.default_value, read_none=True)
+            == self.expected_value
+        )
 
-    def test_reading_set_nullable_variable_without_default_returns_set_value(
+    def test_reading_set_read_none_variable_without_default_returns_set_value(
         self, env, setvars
     ):
         setvars(foo=self.expected_value)
-        assert self.call_(env, "foo") == self.expected_value
+        assert self.call(env, "foo", read_none=True) == self.expected_value
 
-    def test_reading_unset_nullable_variable_with_default_returns_default_value(
+    def test_reading_unset_read_none_variable_with_default_returns_default_value(
         self, env, setvars
     ):
-        assert self.call_(env, "foo", self.default_value) == self.default_value
+        assert (
+            self.call(env, "foo", self.default_value, read_none=True)
+            == self.default_value
+        )
 
-    def test_reading_unset_nullable_variable_without_default_raises_error(
+    def test_reading_unset_read_none_variable_without_default_raises_error(
         self, env, setvars
     ):
         with pytest.raises(EnvracUnsetVariableError):
-            self.call_(env, "foo")
+            self.call(env, "foo", read_none=True)
 
-    def test_reading_nullable_unconvertible_type_raises_error(self, env, setvars):
+    def test_reading_read_none_unconvertible_type_raises_error(self, env, setvars):
         if self.unonvertible_value:
             setvars(foo=self.unonvertible_value)
             with pytest.raises(EnvracParsingError):
-                self.call_(env, "foo")
+                self.call(env, "foo", read_none=True)
 
     @pytest.mark.parametrize("value", VALID_NULL_STRINGS)
-    def test_reading_nullable_variable_set_to_none_without_default_returns_none(
+    def test_reading_read_none_variable_set_to_none_without_default_returns_none(
         self, env, value, setvars
     ):
         setvars(foo=value)
-        assert self.call_(env, "foo") is None
+        assert self.call(env, "foo", read_none=True) is None
 
     @pytest.mark.parametrize("value", VALID_NULL_STRINGS)
-    def test_reading_nullable_variable_set_to_none_with_default_returns_none(
+    def test_reading_read_none_variable_set_to_none_with_default_returns_none(
         self, env, value, setvars
     ):
         setvars(foo=value)
-        assert self.call_(env, "foo", self.default_value) is None
+        assert self.call(env, "foo", self.default_value, read_none=True) is None
 
     def test_with_prefix(self, env, setvars):
         setvars(FOO_A=self.expected_value, A=self.other_value)

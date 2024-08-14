@@ -1,5 +1,7 @@
-from typing import Any
 import os
+from datetime import date, datetime, time
+from typing import Any
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from .config import Config
@@ -29,13 +31,15 @@ class _Env:
         name: str,
         type: ValueType,
         default: Any,
-        nullable: bool = False,
+        read_none: bool = False,
         choices: list[Any] | None = None,
         min_val: Any = None,
         max_val: Any = None,
     ) -> Any:
         if self._prefix:
             name = f"{self._prefix}{name}"
+        if isinstance(default, str):
+            default = self.parser.parse(type, name, default)
         self._register.add(
             name=name,
             type=type,
@@ -43,7 +47,7 @@ class _Env:
             choices=choices,
             min_val=min_val,
             max_val=max_val,
-            nullable=nullable,
+            read_none=read_none,
         )
         raw_value = os.environ.get(name)
         if raw_value is None:
@@ -52,7 +56,7 @@ class _Env:
                     raise EnvracUnsetVariableError(name)
             else:
                 final_value = default
-        elif nullable and is_null_string(raw_value):
+        elif read_none and is_null_string(raw_value):
             return None
         else:
             final_value = self.parser.parse(type, name, raw_value)
@@ -83,44 +87,52 @@ class _Env:
         return final_value
 
     @contextmanager
-    def prefix(self, prefix: str):
+    def prefix(self, prefix: str) -> Generator:
         try:
             self._prefix = prefix
             yield
         finally:
             self._prefix = None
 
-    def clear(self):
-        self._register.clear()
+    def reset(self) -> None:
+        self._register.reset()
 
-    def print(self, *order_by: str):
+    def put(self, name: str, value: Any = None) -> None:
+        if value is None:
+            del os.environ[name]
+        else:
+            os.environ[name] = str(value)
+
+    def print(self, *order_by: str) -> None:
         self._register.print(*order_by)
 
     def dict(self, *fields, drop_prefix=False) -> dict:
         values = {}
         for field in fields:
-            name, type, default, nullable = self.parser.parse_dict_field(field)
-            val = self._getvar(name, type, default, nullable=nullable)
+            name, type, default, read_none = self.parser.parse_dict_field(field)
+            val = self._getvar(name, type, default, read_none=read_none)
             if not drop_prefix and self._prefix:
                 name = f"{self._prefix}{name}"
             values[name] = val
         return values
 
-    def str(self, name, default=Undefined, choices=None):
-        return self._getvar(name, ValueType.str, default, choices=choices)
-
-    def str_(self, name, default=Undefined, choices=None):
+    def str(self, name, default=Undefined, choices=None, read_none=False) -> str | None:
         return self._getvar(
-            name, ValueType.str, default, choices=choices, nullable=True
+            name, ValueType.str, default, choices=choices, read_none=read_none
         )
 
-    def bool(self, name, default=Undefined):
-        return self._getvar(name, ValueType.bool, default)
+    def bool(self, name, default=Undefined, read_none=False) -> bool | None:
+        return self._getvar(name, ValueType.bool, default, read_none=read_none)
 
-    def bool_(self, name, default=Undefined):
-        return self._getvar(name, ValueType.bool, default, nullable=True)
-
-    def date(self, name, default=Undefined, choices=None, min_val=None, max_val=None):
+    def date(
+        self,
+        name,
+        default=Undefined,
+        choices=None,
+        min_val=None,
+        max_val=None,
+        read_none=False,
+    ) -> date | None:
         return self._getvar(
             name,
             ValueType.date,
@@ -128,22 +140,18 @@ class _Env:
             choices=choices,
             min_val=min_val,
             max_val=max_val,
-        )
-
-    def date_(self, name, default=Undefined, choices=None, min_val=None, max_val=None):
-        return self._getvar(
-            name,
-            ValueType.date,
-            default,
-            choices=choices,
-            min_val=min_val,
-            max_val=max_val,
-            nullable=True,
+            read_none=read_none,
         )
 
     def datetime(
-        self, name, default=Undefined, choices=None, min_val=None, max_val=None
-    ):
+        self,
+        name,
+        default=Undefined,
+        choices=None,
+        min_val=None,
+        max_val=None,
+        read_none=False,
+    ) -> datetime | None:
         return self._getvar(
             name,
             ValueType.datetime,
@@ -151,22 +159,18 @@ class _Env:
             choices=choices,
             min_val=min_val,
             max_val=max_val,
+            read_none=read_none,
         )
 
-    def datetime_(
-        self, name, default=Undefined, choices=None, min_val=None, max_val=None
-    ):
-        return self._getvar(
-            name,
-            ValueType.datetime,
-            default,
-            choices=choices,
-            min_val=min_val,
-            max_val=max_val,
-            nullable=True,
-        )
-
-    def int(self, name, default=Undefined, choices=None, min_val=None, max_val=None):
+    def int(
+        self,
+        name,
+        default=Undefined,
+        choices=None,
+        min_val=None,
+        max_val=None,
+        read_none=False,
+    ) -> int | None:
         return self._getvar(
             name,
             ValueType.int,
@@ -174,30 +178,18 @@ class _Env:
             choices=choices,
             min_val=min_val,
             max_val=max_val,
+            read_none=read_none,
         )
 
-    def int_(self, name, default=Undefined, choices=None, min_val=None, max_val=None):
-        return self._getvar(
-            name,
-            ValueType.int,
-            default,
-            choices=choices,
-            min_val=min_val,
-            max_val=max_val,
-            nullable=True,
-        )
-
-    def float(self, name, default=Undefined, choices=None, min_val=None, max_val=None):
-        return self._getvar(
-            name,
-            ValueType.float,
-            default,
-            choices=choices,
-            min_val=min_val,
-            max_val=max_val,
-        )
-
-    def float_(self, name, default=Undefined, choices=None, min_val=None, max_val=None):
+    def float(
+        self,
+        name,
+        default=Undefined,
+        choices=None,
+        min_val=None,
+        max_val=None,
+        read_none=False,
+    ) -> float | None:
         return self._getvar(
             name,
             ValueType.float,
@@ -205,10 +197,18 @@ class _Env:
             choices=choices,
             min_val=min_val,
             max_val=max_val,
-            nullable=True,
+            read_none=read_none,
         )
 
-    def time(self, name, default=Undefined, choices=None, min_val=None, max_val=None):
+    def time(
+        self,
+        name,
+        default=Undefined,
+        choices=None,
+        min_val=None,
+        max_val=None,
+        read_none=False,
+    ) -> time | None:
         return self._getvar(
             name,
             ValueType.time,
@@ -216,17 +216,7 @@ class _Env:
             choices=choices,
             min_val=min_val,
             max_val=max_val,
-        )
-
-    def time_(self, name, default=Undefined, choices=None, min_val=None, max_val=None):
-        return self._getvar(
-            name,
-            ValueType.time,
-            default,
-            choices=choices,
-            min_val=min_val,
-            max_val=max_val,
-            nullable=True,
+            read_none=read_none,
         )
 
 

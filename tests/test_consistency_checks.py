@@ -10,11 +10,11 @@ class TestVarSpecficationUniqueness:
             env.str("BAR", default="abc")
             env.str("BAR", default="def")
 
-    def test_changing_nullable_raises_error(self, env, setvars):
+    def test_changing_read_none_raises_error(self, env, setvars):
         setvars(BAR="hello")
         with pytest.raises(EnvracSpecificationError):
             env.str("BAR")
-            env.str_("BAR")
+            env.str("BAR", read_none=True)
 
     def test_changing_type_raises_error(self, env, setvars):
         setvars(BAR="77")

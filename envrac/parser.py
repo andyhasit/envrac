@@ -64,11 +64,11 @@ class Parser:
             ?FOO:int=0   # read FOO as an int, default to 0, but allow 'NULL'
         """
         # special char order check
-        nullable = False
+        read_none = False
         default_str = None
         type_str = "str"
         if field.startswith("?"):
-            nullable = True
+            read_none = True
             field = field[1:]
         if ":" in field:
             name, field = field.split(":")
@@ -93,4 +93,4 @@ class Parser:
         else:
             default = Undefined
 
-        return name, type, default, nullable
+        return name, type, default, read_none

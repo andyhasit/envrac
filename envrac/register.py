@@ -20,7 +20,7 @@ class Register:
         else:
             self.vars[spec.name] = spec
 
-    def clear(self) -> None:
+    def reset(self) -> None:
         self.vars.clear()
 
     def list(self, *order_by: str) -> list[VarSpec]:
@@ -33,7 +33,7 @@ class Register:
             "NAME",
             "TYPE",
             "DEFAULT",
-            "NULLABLE",
+            "READ_NONE",
             "CHOICES",
             "MIN",
             "MAX",
@@ -46,7 +46,7 @@ class Register:
                 spec.name,
                 spec.type.value,
                 spec.default,
-                spec.nullable,
+                spec.read_none,
                 len(spec.choices) if spec.choices else None,
                 spec.min_val,
                 spec.max_val,
