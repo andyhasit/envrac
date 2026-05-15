@@ -1,18 +1,33 @@
 # Envrac
 
-*Brings consistency to environment variables.*
+*Env var consistency in Python.*
 
 ## Overview
 
-Envrac (**en**vironment **v**ariable **r**eading **a**nd **c**hecking) is a tiny library for reading environment variables in Python:
+Python lets you read the same environment variable differently in different locations:
+
+  - Different default values.
+  - Different type casting.
+  - Different formats.
+
+This can cause issues that are hard to defend against, especially in projects with multiple libraries and entry points.
+
+Envrac (**en**vironment **v**ariable **r**eading **a**nd **c**hecking, but also from the French _en vrac_) is a tiny library which solves this issue, and includes a few related goodies.
+
 
 ```python
 >>> from envrac import env
->>> env.int('AGE')
-42
+>>> env.int('SIZE', 10)
+10
+>>> env.int('SIZE', 11)
+envrac.exceptions.EnvracSpecificationError: 
+  Environment variable "SIZE" requested differently in multiple places.
+  Diff: 
+    default: 10 != 11
+  See envrac documentation for help
 ```
 
-You should definitely use envrac instead or `os.environ`/`os.getenv` as it:
+You simply use envrac in place of or `os.environ`/`os.getenv` and get the following benefits:
 
 1. Ensures variables are read consistently (type and default) throughout your project*.
 2. Lets you discover all the variables that your project* reads.
